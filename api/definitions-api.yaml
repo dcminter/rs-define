@@ -1,0 +1,70 @@
+swagger: "2.0"
+info:
+  version: 0.1.0
+  title: Definitions API
+  description: An API that allows key/value pairs to be stored for later human consumption
+  termsOfService: http://define.paperstack.com/terms/
+host: definitions.paperstack.com
+basePath: "/api"
+schemes:
+  - https
+consumes:
+  - application/json
+produces:
+  - application/json
+paths:
+  "/define/{term}":
+    get:
+      description: Returns the definition for a term (usually an abbreviation)
+      operationId: readDefinition
+      produces:
+        - application/json
+        - text/html
+      parameters:
+        - name: term
+          in: path
+          description: The term (usually an abbreviation) to expand
+          required: true
+          type: string
+      responses:
+        '200':
+          description: At least one definition is known for the term
+          schema:
+            type: array
+            items:
+              "$ref": "#/definitions/Definition"
+        '404':
+          description: No definition is known for the term
+    post:
+      description: Creates a new definition for a term
+      operationId: createDefinition
+      produces:
+        - application/json
+      parameters:
+        - name: token
+          in: header
+          description: The token permitting the user to submit definitions
+          type: string
+          required: true
+        - name: definition
+          in: body
+          description: Definition to add to the dictionary
+          required: true
+          schema:
+            "$ref": "#/definitions/Definition"
+      responses:
+        '200':
+          description: The stored definition
+          schema:
+            "$ref": "#/definitions/Definition"
+definitions:
+  Definition:
+    type: object
+    required:
+      - key
+      - value
+    properties:
+      key:
+        type: string
+      value:
+        type: string
