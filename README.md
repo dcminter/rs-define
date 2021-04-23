@@ -33,24 +33,19 @@ the definitions paths are populated with the default paths:
 
 Each definition path is combined with the first parameter to give a file name until a user readable file is found.
 
-If no file is found an error message is sent to stderr and the program exits with an error code.
-
-If a file is found the contents are copied to stdout and the program exits with a success code.
+  * If no file is found an error message is sent to stderr and the program exits with an **error** code.
+  * If a file is found the contents are copied to stdout and the program exits with a **success** code.
 
 ### In store mode (two parameters)
 
 Each definition path is combined with the first parameter to give a file name until a user writeable file is 
 found (or a user writeable file can be created).
 
-If no such file can be found an error message is sent to stderr and the program exits with an error code.
-
-If a file is found then the contents of the second parameter are normalised (see below).
-
-The contents of the file are tested for the presence of a normalised copy of the second parameter.
-
-If the normalised copy of the second parameter is not found then it is appended as a new line to the file.
-
-The normalised copy of the second parameter is then written to stdout and the program exits with a success code.
+  * If no such file can be found an error message is sent to stderr and the program exits with an **error** code.
+  * If a file is found then the contents of the second parameter are [normalised](#normalisation).
+  * The contents of the file are tested for the presence of a normalised copy of the second parameter.
+  * If the [normalised](#normalisation) copy of the second parameter is not found then it is appended as a new line to the file.
+  * The normalised copy of the second parameter is then written to stdout and the program exits with a success code.
 
 ### Normalisation
 
@@ -63,12 +58,20 @@ with an error code.
 This is not an exhaustive list
 
   * ~~Lookup directory handling and parsing~~
-  * Complete the basic read behaviour
+  * ~~Complete the basic read behaviour~~
+  * ~~Proper error handling (read path)~~ including error levels
+  * Tests!
+  * Logging output    
   * Complete the basic write behaviour
-  * Proper error handling
-  * Errorlevels
+  * Proper error handling (write path) including error levels
 
 ## Future features
 
+  * Namespacing
   * Allow for hosting of definitions on a remote server instead of, or as well as, in the local filesystem.
   * Maybe fix up for Windows as well as Linux?
+  * Tools to delete definitions
+
+## Error codes
+
+Errorlevels may change. Scripts should test for success (status == 0) or failure (status != 0) only.
