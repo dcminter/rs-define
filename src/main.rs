@@ -1,3 +1,5 @@
+use ansi_term::Colour::Red;
+use atty::Stream::Stderr;
 use clap::Clap;
 use std::ffi::OsString;
 use std::fs::File;
@@ -49,6 +51,24 @@ fn define() -> i32 {
 fn store(key: String, value: String) -> Result<(), Error> {
     log::debug!("Will store: {} with key {}", value, key);
 
+    let candidate_paths = gather_candidate_paths(&key);
+    log::debug!("Candidate paths: {:?}", candidate_paths);
+
+    store_on_appropriate_path(candidate_paths, &key, &value)
+}
+
+fn store_on_appropriate_path(
+    candidate_paths: Vec<PathBuf>,
+    key: &String,
+    value: &String,
+) -> Result<(), Error> {
+    log::error!(
+        "Not yet implemented! Paths {:?}, Key {:?}, Value {:?}",
+        candidate_paths,
+        key,
+        value
+    );
+
     Ok(())
 }
 
@@ -84,14 +104,24 @@ fn display_from_appropriate_path(candidate_paths: Vec<PathBuf>, key: &String) ->
         match File::open(&candidate_path) {
             Err(error) => log::debug!("Error {:?} for path {:?}", error, &candidate_path),
             Ok(file) => {
-                // println!("Success for path {:?}", &candidate_path);
+                log::debug!("Success for path {:?}", &candidate_path);
                 dump_file_to_console(file);
                 return Ok(());
             }
         }
     }
 
-    eprintln!("No definition found for '{}'", key);
+    // Is there a smart way to colour the whole string but still allow pattern
+    // substitution? Also is there a better way to turn it off if we're not
+    // talking to a tty?
+    eprintln!(
+        "No definition found for '{}'",
+        if atty::is(Stderr) {
+            Red.paint(key).to_string()
+        } else {
+            key.to_string()
+        }
+    );
     Err(Error::from(ErrorKind::NotFound))
 }
 
@@ -110,6 +140,7 @@ fn expand_default_paths(key: &String) -> Vec<PathBuf> {
         .into_iter()
         .map(|p| shellexpand::tilde(p).to_string())
         .map(PathBuf::from)
+        // Is there a more elegant way to implement the following closure?
         .map(|mut paths| {
             paths.push(key);
             paths

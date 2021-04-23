@@ -65,7 +65,7 @@ This is not an exhaustive list
   * Drive logging from clap parameter instead of `RUST_LOG` (and default to completely off!)
   * Complete the basic write behaviour
   * Proper error handling (write path) including error levels
-  * Colour (ANSI) output
+  * *Colour (ANSI) output* (trying `ansi_term` but looks like it might not work so well with file streams)
 
 ## Future features
 
