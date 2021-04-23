@@ -61,7 +61,8 @@ This is not an exhaustive list
   * ~~Complete the basic read behaviour~~
   * ~~Proper error handling (read path)~~ including error levels
   * Tests!
-  * Logging output    
+  * ~~Logging output~~
+  * Drive logging from clap parameter instead of `RUST_LOG` (and default to completely off!)
   * Complete the basic write behaviour
   * Proper error handling (write path) including error levels
 

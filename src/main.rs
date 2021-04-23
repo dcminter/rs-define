@@ -26,23 +26,40 @@ static PREFERRED_PATHS: [&str; 3] = ["~/.define", "~/.config/define", "/etc/defi
 
 static DEFINITIONS_PATH_KEY: &str = "DEFINITIONS_DICTIONARY_PATH";
 
-fn main() -> Result<(), std::io::Error> {
+fn main() {
+    std::process::exit(define());
+}
+
+fn define() -> i32 {
+    env_logger::init();
+
     let options: Opts = Opts::parse();
 
-    match options.definition {
+    let result = match options.definition {
         None => lookup(options.key),
         Some(value) => store(options.key, value),
+    };
+
+    match result {
+        Ok(_) => {
+            log::debug!("Completed OK");
+            0
+        }
+        Err(error) => {
+            log::error!("Failed: {}", error);
+            1
+        }
     }
 }
 
 fn store(key: String, value: String) -> Result<(), Error> {
-    println!("Will store: {} with key {}", value, key);
+    log::debug!("Will store: {} with key {}", value, key);
 
     Ok(())
 }
 
 fn lookup(key: String) -> Result<(), Error> {
-    //println!("Lookup: {}", &key);
+    log::debug!("Lookup: {}", &key);
     let paths = match &env::var_os(DEFINITIONS_PATH_KEY) {
         Some(paths) => expand_supplied_paths(paths, &key),
         None => expand_default_paths(&key),
@@ -68,7 +85,7 @@ fn display_appropriate_path(candidate_paths: Vec<PathBuf>, key: &String) -> Resu
     // that to the console
     for candidate_path in candidate_paths {
         match File::open(&candidate_path) {
-            Err(_) => {} /*println!("Error for path {:?}", &candidate_path)*/
+            Err(_) => log::debug!("Error for path {:?}", &candidate_path),
             Ok(file) => {
                 // println!("Success for path {:?}", &candidate_path);
                 dump_file_to_console(file);
@@ -86,7 +103,7 @@ fn dump_file_to_console(file: File) {
     let mut writer = BufWriter::new(io::stdout());
     match io::copy(&mut reader, &mut writer) {
         Err(err) => eprintln!("ERROR: failed {:?}", err),
-        Ok(_) => {} /* println!("Ok, wrote {} bytes", value) */
+        Ok(value) => log::debug!("Ok, wrote {} bytes", value),
     }
 }
 
