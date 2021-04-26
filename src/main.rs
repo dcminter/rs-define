@@ -1,9 +1,10 @@
-use ansi_term::Colour::Red;
+use ansi_term::Colour::{Green, Red};
 use atty::Stream::Stderr;
 use clap::Clap;
+use env_logger::Env;
 use std::ffi::OsString;
 use std::fs::File;
-use std::io::{BufReader, BufWriter, Error, ErrorKind};
+use std::io::{BufReader, BufWriter, Error, ErrorKind, Write};
 use std::path::PathBuf;
 use std::{env, io};
 
@@ -18,6 +19,9 @@ struct Opts {
     definition: Option<String>,
 }
 
+static DEFAULT_LOGGING_ENV_VAR: &str = "DEFINE_LOG";
+static DEFAULT_LOGGING_LEVEL: &str = "off";
+
 static PREFERRED_PATHS: [&str; 3] = ["~/.define", "~/.config/define", "/etc/define"];
 
 static DEFINITIONS_PATH_KEY: &str = "DEFINITIONS_DICTIONARY_PATH";
@@ -27,7 +31,10 @@ fn main() {
 }
 
 fn define() -> i32 {
-    env_logger::init();
+    env_logger::Builder::from_env(
+        Env::default().filter_or(DEFAULT_LOGGING_ENV_VAR, DEFAULT_LOGGING_LEVEL),
+    )
+    .init();
 
     let options: Opts = Opts::parse();
 
@@ -62,9 +69,32 @@ fn store_on_appropriate_path(
     key: &String,
     value: &String,
 ) -> Result<(), Error> {
+    // Need some rules here to allow us to *create* the path (at least for some paths)
+    // if it doesn't exist.
+
+    // for /.../foo/bar/TERM
+    // if /.../foo/bar/TERM exists and is writeable, append to it
+    // if /.../foo/bar/ exists and is writeable, create /.../foo/bar/TERM and then append to it
+    // if /.../foo/ exists and is writeable by this user and is on or below $HOME, create /.../foo/bar/, then
+    // create /foo/bar/TERM and then append to it
+
+    // TODO: Implement and move the above into the documentation (also check there aren't
+    //       better existing configuration directory handling crates.
+
+    for candidate_path in &candidate_paths {
+        match File::open(&candidate_path) {
+            Err(error) => {
+                log::debug!("Error {:?} for path {:?}", error, &candidate_path)
+            }
+            Ok(_file) => {
+                log::debug!("Opened file for path {:?}", &candidate_path);
+            }
+        }
+    }
+
     log::error!(
         "Not yet implemented! Paths {:?}, Key {:?}, Value {:?}",
-        candidate_paths,
+        &candidate_paths,
         key,
         value
     );
@@ -128,9 +158,26 @@ fn display_from_appropriate_path(candidate_paths: Vec<PathBuf>, key: &String) ->
 fn dump_file_to_console(file: File) {
     let mut reader = BufReader::new(file);
     let mut writer = BufWriter::new(io::stdout());
+
+    // This seems clunky... what's a better way to wrap the copy in the ANSI output?
+
+    if atty::is(Stderr) {
+        match write!(&mut writer, "{}", Green.prefix()) {
+            Err(_) => {}
+            Ok(_) => {}
+        }
+    }
+
     match io::copy(&mut reader, &mut writer) {
         Err(err) => eprintln!("ERROR: failed {:?}", err),
         Ok(value) => log::debug!("Ok, wrote {} bytes", value),
+    }
+
+    if atty::is(Stderr) {
+        match write!(&mut writer, "{}", Green.suffix()) {
+            Err(_) => {}
+            Ok(_) => {}
+        }
     }
 }
 

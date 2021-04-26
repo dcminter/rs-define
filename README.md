@@ -1,7 +1,6 @@
 # Definitions Dictionary
 
-A command line dictionary to allow you to curate definitions for  
-words, abbreviations, and phrases.
+A simple tool for curation and lookup of definitions and for other dictionary-like purposes
 
 For example:
 ```
@@ -62,10 +61,10 @@ This is not an exhaustive list
   * ~~Proper error handling (read path) including error levels~~
   * Tests!
   * ~~Logging output~~
-  * Drive logging from clap parameter instead of `RUST_LOG` (and default to completely off!)
+  * Drive logging from clap parameter ~~instead of `DEFINE_LOG`(changed default from `RUST_LOG`) (and default to completely off!)~~
   * Complete the basic write behaviour
   * Proper error handling (write path) including error levels
-  * *Colour (ANSI) output* (trying `ansi_term` but looks like it might not work so well with file streams)
+  * ~~Colour (ANSI) output~~
 
 ## Future features
 
