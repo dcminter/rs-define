@@ -1,12 +1,15 @@
-use ansi_term::Colour::{Green, Red};
-use atty::Stream::Stderr;
-use clap::Clap;
-use env_logger::Env;
 use std::ffi::OsString;
 use std::fs::File;
-use std::io::{BufReader, BufWriter, Error, ErrorKind, Write};
+use std::fs::OpenOptions;
+use std::io::{BufRead, BufReader, BufWriter, Error, ErrorKind, Seek, SeekFrom, Write};
 use std::path::PathBuf;
-use std::{env, io};
+use std::{env, fs, io};
+
+use ansi_term::Colour::{Green, Red};
+use atty::Stream::{Stderr, Stdout};
+use clap::Clap;
+use env_logger::Env;
+use regex::Regex;
 
 /// A simple tool for curation and lookup of definitions and for other dictionary-like purposes
 #[derive(Clap)]
@@ -17,12 +20,16 @@ struct Opts {
 
     /// The value to store in the dictionary
     definition: Option<String>,
+
+    /// Logging level (if any)
+    #[clap(short, long)]
+    logs: Option<String>,
 }
 
 static DEFAULT_LOGGING_ENV_VAR: &str = "DEFINE_LOG";
 static DEFAULT_LOGGING_LEVEL: &str = "off";
 
-static PREFERRED_PATHS: [&str; 3] = ["~/.define", "~/.config/define", "/etc/define"];
+static PREFERRED_PATHS: [&str; 3] = ["~/.config/define", "~/.define", "/etc/define"];
 
 static DEFINITIONS_PATH_KEY: &str = "DEFINITIONS_DICTIONARY_PATH";
 
@@ -31,12 +38,11 @@ fn main() {
 }
 
 fn define() -> i32 {
-    env_logger::Builder::from_env(
-        Env::default().filter_or(DEFAULT_LOGGING_ENV_VAR, DEFAULT_LOGGING_LEVEL),
-    )
-    .init();
-
     let options: Opts = Opts::parse();
+
+    let level = options.logs.unwrap_or(DEFAULT_LOGGING_LEVEL.to_owned());
+
+    env_logger::Builder::from_env(Env::default().filter_or(DEFAULT_LOGGING_ENV_VAR, level)).init();
 
     let result = match options.definition {
         None => lookup(options.key),
@@ -61,66 +67,128 @@ fn store(key: String, value: String) -> Result<(), Error> {
     let candidate_paths = gather_candidate_paths(&key);
     log::debug!("Candidate paths: {:?}", candidate_paths);
 
-    store_on_appropriate_path(candidate_paths, &key, &value)
+    store_on_appropriate_path(candidate_paths, &value)
 }
 
-fn store_on_appropriate_path(
-    candidate_paths: Vec<PathBuf>,
-    key: &String,
-    value: &String,
-) -> Result<(), Error> {
-    // Need some rules here to allow us to *create* the path (at least for some paths)
-    // if it doesn't exist.
-
-    // for /.../foo/bar/TERM
-    // if /.../foo/bar/TERM exists and is writeable, append to it
-    // if /.../foo/bar/ exists and is writeable, create /.../foo/bar/TERM and then append to it
-    // if /.../foo/ exists and is writeable by this user and is on or below $HOME, create /.../foo/bar/, then
-    // create /foo/bar/TERM and then append to it
-
-    // TODO: Implement and move the above into the documentation (also check there aren't
-    //       better existing configuration directory handling crates.
-
+fn store_on_appropriate_path(candidate_paths: Vec<PathBuf>, value: &String) -> Result<(), Error> {
     for candidate_path in &candidate_paths {
-        match File::open(&candidate_path) {
-            Err(error) => {
-                log::debug!("Error {:?} for path {:?}", error, &candidate_path)
+        match materialize_path(&candidate_path) {
+            Ok(_) => {
+                log::debug!(
+                    "Successfully created path {:?} or it already exists",
+                    candidate_path
+                )
             }
-            Ok(_file) => {
-                log::debug!("Opened file for path {:?}", &candidate_path);
+            Err(_) => {
+                log::debug!("Couldn't create path {:?}", candidate_path);
+                continue;
+            }
+        }
+
+        match OpenOptions::new()
+            .write(true)
+            .create(true)
+            .read(true)
+            .append(true)
+            .open(candidate_path)
+        {
+            Err(error) => {
+                log::debug!("Error {:?} for path {:?}", error, &candidate_path);
+            }
+            Ok(mut file) => {
+                log::debug!("Opened file for appending on path {:?}", &candidate_path);
+                if file.contains_text(&file, &value) {
+                    log::debug!("File already contains the value, dumping to console");
+                    file.seek(SeekFrom::Start(0))?;
+                    dump_file_to_console(file)?;
+                    return Ok(());
+                } else {
+                    log::debug!(
+                        "File does not contain the value, adding and then dumping to console"
+                    );
+                    writeln!(&file, "{}", value)?;
+                    file.flush()?;
+                    file.seek(SeekFrom::Start(0))?;
+                    dump_file_to_console(file)?;
+                    return Ok(());
+                }
             }
         }
     }
 
-    log::error!(
-        "Not yet implemented! Paths {:?}, Key {:?}, Value {:?}",
-        &candidate_paths,
-        key,
-        value
+    // Is this errorkind sensible?
+    Err(Error::from(ErrorKind::NotFound))
+}
+
+fn materialize_path(path: &PathBuf) -> Result<(), Error> {
+    log::debug!(
+        "Create the path {} if that seems necessary",
+        path.to_string_lossy()
     );
 
-    Ok(())
+    if path.exists() {
+        log::debug!("Path {} exists already", path.to_string_lossy());
+        Ok(())
+    } else {
+        log::debug!(
+            "Path {} does not exist, will try to create the parent if necessary",
+            path.to_string_lossy()
+        );
+        match path.parent() {
+            Some(parent) => {
+                if parent.exists() {
+                    log::debug!("Parent path {} exists already", parent.to_string_lossy());
+                    Ok(())
+                } else {
+                    log::debug!(
+                        "Parent path {} doesn't exist - trying to create it",
+                        parent.to_string_lossy()
+                    );
+                    fs::create_dir_all(parent)
+                }
+            }
+            None => Ok(()),
+        }
+    }
+}
+
+// This is probably overkill, I just wanted to try it :)
+trait ContainsText {
+    fn contains_text(&self, file: &File, text: &str) -> bool;
+}
+
+impl ContainsText for File {
+    fn contains_text(&self, file: &File, text: &str) -> bool {
+        let reader = BufReader::new(file);
+
+        // TODO: Ignore case
+        let pattern: &str = &["^", &regex::escape(text), "$"].concat();
+
+        // Are the following unwraps cool or should I be handling this more explicitly?
+        let re = Regex::new(&pattern).unwrap();
+        reader
+            .lines()
+            .into_iter()
+            .any(|line| re.is_match(&line.unwrap()))
+    }
 }
 
 fn lookup(key: String) -> Result<(), Error> {
     log::debug!("Lookup: {}", &key);
-    let candidate_paths = gather_candidate_paths(&key);
+    let candidate_paths = gather_candidate_read_paths(&key);
     log::debug!("Candidate paths: {:?}", candidate_paths);
     display_from_appropriate_path(candidate_paths, &key)
 }
 
 fn gather_candidate_paths(key: &String) -> Vec<PathBuf> {
-    // Filter out any paths that
-    //   * Don't exist
-    //   * Aren't files
-    let paths = match &env::var_os(DEFINITIONS_PATH_KEY) {
+    match &env::var_os(DEFINITIONS_PATH_KEY) {
         Some(paths) => expand_supplied_paths(paths, &key),
         None => expand_default_paths(&key),
-    };
+    }
+}
 
-    log::debug!("Will check paths: {:?}", paths);
-
-    paths
+fn gather_candidate_read_paths(key: &String) -> Vec<PathBuf> {
+    gather_candidate_paths(&key)
         .into_iter()
         .filter(|p| p.exists())
         .filter(|p| p.is_file())
@@ -135,7 +203,7 @@ fn display_from_appropriate_path(candidate_paths: Vec<PathBuf>, key: &String) ->
             Err(error) => log::debug!("Error {:?} for path {:?}", error, &candidate_path),
             Ok(file) => {
                 log::debug!("Success for path {:?}", &candidate_path);
-                dump_file_to_console(file);
+                dump_file_to_console(file)?;
                 return Ok(());
             }
         }
@@ -155,30 +223,23 @@ fn display_from_appropriate_path(candidate_paths: Vec<PathBuf>, key: &String) ->
     Err(Error::from(ErrorKind::NotFound))
 }
 
-fn dump_file_to_console(file: File) {
+fn dump_file_to_console(file: File) -> Result<(), Error> {
     let mut reader = BufReader::new(file);
     let mut writer = BufWriter::new(io::stdout());
-
-    // This seems clunky... what's a better way to wrap the copy in the ANSI output?
-
-    if atty::is(Stderr) {
-        match write!(&mut writer, "{}", Green.prefix()) {
-            Err(_) => {}
-            Ok(_) => {}
-        }
+    if atty::is(Stdout) {
+        write!(&mut writer, "{}", Green.prefix())?;
     }
-
     match io::copy(&mut reader, &mut writer) {
-        Err(err) => eprintln!("ERROR: failed {:?}", err),
+        Err(err) => {
+            eprintln!("ERROR: failed {:?}", err);
+            return Err(err);
+        }
         Ok(value) => log::debug!("Ok, wrote {} bytes", value),
     }
-
-    if atty::is(Stderr) {
-        match write!(&mut writer, "{}", Green.suffix()) {
-            Err(_) => {}
-            Ok(_) => {}
-        }
+    if atty::is(Stdout) {
+        write!(&mut writer, "{}", Green.suffix())?;
     }
+    Ok(())
 }
 
 fn expand_default_paths(key: &String) -> Vec<PathBuf> {
