@@ -267,3 +267,48 @@ fn expand_supplied_paths(paths: &OsString, key: &String) -> Vec<PathBuf> {
         })
         .collect()
 }
+
+// Some unit tests...
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_expand_supplied_paths() {
+        // Given inputs...
+        let input_paths = OsString::from("/tmp:/tmp/other:/tmp/other/stuff");
+        let input_key = "FOO".to_string();
+
+        // When we expand them...
+        let output = expand_supplied_paths(&input_paths, &input_key);
+
+        // We expect to get...
+        let mut expected = vec![
+            PathBuf::from("/tmp/FOO"),
+            PathBuf::from("/tmp/other/FOO"),
+            PathBuf::from("/tmp/other/stuff/FOO"),
+        ];
+
+        assert_eq!(output, expected);
+    }
+
+    #[test]
+    fn test_expand_default_paths() {
+        let output = expand_default_paths(&"FOO".to_string());
+
+        let home = env::var_os("HOME").unwrap();
+
+        // TODO: Why do I get a (seemingly wrong?) compiler warning about this not needing to be mutable?
+        let mut expected = vec![
+            PathBuf::from(&home),
+            PathBuf::from(&home),
+            PathBuf::from("/etc/define/FOO"),
+        ];
+
+        expected[0].push(".config/define/FOO");
+        expected[1].push(".define/FOO");
+
+        assert_eq!(output, expected);
+    }
+}
