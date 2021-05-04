@@ -100,7 +100,7 @@ fn store_on_appropriate_path(candidate_paths: Vec<PathBuf>, value: &String) -> R
                 if file.contains_text(&file, &value) {
                     log::debug!("File already contains the value, dumping to console");
                     file.seek(SeekFrom::Start(0))?;
-                    dump_file_to_console(file)?;
+                    dump_file_to_output(file, Box::new(io::stdout()))?;
                     return Ok(());
                 } else {
                     log::debug!(
@@ -109,7 +109,7 @@ fn store_on_appropriate_path(candidate_paths: Vec<PathBuf>, value: &String) -> R
                     writeln!(&file, "{}", value)?;
                     file.flush()?;
                     file.seek(SeekFrom::Start(0))?;
-                    dump_file_to_console(file)?;
+                    dump_file_to_output(file, Box::new(io::stdout()))?;
                     return Ok(());
                 }
             }
@@ -203,7 +203,7 @@ fn display_from_appropriate_path(candidate_paths: Vec<PathBuf>, key: &String) ->
             Err(error) => log::debug!("Error {:?} for path {:?}", error, &candidate_path),
             Ok(file) => {
                 log::debug!("Success for path {:?}", &candidate_path);
-                dump_file_to_console(file)?;
+                dump_file_to_output(file, Box::new(io::stdout()))?;
                 return Ok(());
             }
         }
@@ -223,9 +223,9 @@ fn display_from_appropriate_path(candidate_paths: Vec<PathBuf>, key: &String) ->
     Err(Error::from(ErrorKind::NotFound))
 }
 
-fn dump_file_to_console(file: File) -> Result<(), Error> {
+fn dump_file_to_output(file: File, output: Box<dyn Write>) -> Result<(), Error> {
     let mut reader = BufReader::new(file);
-    let mut writer = BufWriter::new(io::stdout());
+    let mut writer = BufWriter::new(output);
     if atty::is(Stdout) {
         write!(&mut writer, "{}", Green.prefix())?;
     }
