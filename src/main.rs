@@ -100,7 +100,7 @@ fn store_on_appropriate_path(candidate_paths: Vec<PathBuf>, value: &String) -> R
                 if file.contains_text(&file, &value) {
                     log::debug!("File already contains the value, dumping to console");
                     file.seek(SeekFrom::Start(0))?;
-                    dump_file_to_output(file, Box::new(io::stdout()))?;
+                    dump_file_to_output(file, &mut io::stdout())?;
                     return Ok(());
                 } else {
                     log::debug!(
@@ -109,7 +109,7 @@ fn store_on_appropriate_path(candidate_paths: Vec<PathBuf>, value: &String) -> R
                     writeln!(&file, "{}", value)?;
                     file.flush()?;
                     file.seek(SeekFrom::Start(0))?;
-                    dump_file_to_output(file, Box::new(io::stdout()))?;
+                    dump_file_to_output(file, &mut io::stdout())?;
                     return Ok(());
                 }
             }
@@ -203,7 +203,7 @@ fn display_from_appropriate_path(candidate_paths: Vec<PathBuf>, key: &String) ->
             Err(error) => log::debug!("Error {:?} for path {:?}", error, &candidate_path),
             Ok(file) => {
                 log::debug!("Success for path {:?}", &candidate_path);
-                dump_file_to_output(file, Box::new(io::stdout()))?;
+                dump_file_to_output(file, &mut io::stdout())?;
                 return Ok(());
             }
         }
@@ -223,7 +223,7 @@ fn display_from_appropriate_path(candidate_paths: Vec<PathBuf>, key: &String) ->
     Err(Error::from(ErrorKind::NotFound))
 }
 
-fn dump_file_to_output(file: File, output: Box<dyn Write>) -> Result<(), Error> {
+fn dump_file_to_output(file: File, output: &mut dyn Write) -> Result<(), Error> {
     let mut reader = BufReader::new(file);
     let mut writer = BufWriter::new(output);
     if atty::is(Stdout) {
@@ -268,7 +268,7 @@ fn expand_supplied_paths(paths: &OsString, key: &String) -> Vec<PathBuf> {
         .collect()
 }
 
-// Some unit tests...
+// Some unit tests... (only happy-path for now)
 
 #[cfg(test)]
 mod tests {
@@ -309,5 +309,24 @@ mod tests {
         expected[1].push(".define/FOO");
 
         assert_eq!(output, expected);
+    }
+
+    #[test]
+    fn test_dump_file_to_output() {
+        let content = File::open("tests/fixtures/example_content.txt").unwrap();
+        let mut buffer = Vec::new();
+        dump_file_to_output(content, &mut buffer).unwrap();
+
+        let text = String::from_utf8_lossy(&buffer);
+
+        let expected = "This is\nsome example\ncontent.";
+
+        // Unfortunately the actual value will be affected by the console
+        // type so the expectation must be too:
+        if atty::is(Stdout) {
+            assert_eq!(text, Green.paint(expected).to_string());
+        } else {
+            assert_eq!(text, expected)
+        }
     }
 }
