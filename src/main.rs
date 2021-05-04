@@ -284,7 +284,7 @@ mod tests {
         let output = expand_supplied_paths(&input_paths, &input_key);
 
         // We expect to get...
-        let mut expected = vec![
+        let expected = vec![
             PathBuf::from("/tmp/FOO"),
             PathBuf::from("/tmp/other/FOO"),
             PathBuf::from("/tmp/other/stuff/FOO"),
@@ -299,7 +299,6 @@ mod tests {
 
         let home = env::var_os("HOME").unwrap();
 
-        // TODO: Why do I get a (seemingly wrong?) compiler warning about this not needing to be mutable?
         let mut expected = vec![
             PathBuf::from(&home),
             PathBuf::from(&home),
