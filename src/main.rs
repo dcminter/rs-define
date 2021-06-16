@@ -45,8 +45,8 @@ fn define() -> i32 {
     env_logger::Builder::from_env(Env::default().filter_or(DEFAULT_LOGGING_ENV_VAR, level)).init();
 
     let result = match options.definition {
-        None => lookup(options.key),
-        Some(value) => store(options.key, value),
+        None => lookup(options.key.as_str()),
+        Some(value) => store(options.key.as_str(), value.as_str()),
     };
 
     match result {
@@ -61,16 +61,16 @@ fn define() -> i32 {
     }
 }
 
-fn store(key: String, value: String) -> Result<(), Error> {
+fn store(key: &str, value: &str) -> Result<(), Error> {
     log::debug!("Will store: {} with key {}", value, key);
 
     let candidate_paths = gather_candidate_paths(&key);
     log::debug!("Candidate paths: {:?}", candidate_paths);
 
-    store_on_appropriate_path(candidate_paths, &value)
+    store_on_appropriate_path(candidate_paths, value)
 }
 
-fn store_on_appropriate_path(candidate_paths: Vec<PathBuf>, value: &String) -> Result<(), Error> {
+fn store_on_appropriate_path(candidate_paths: Vec<PathBuf>, value: &str) -> Result<(), Error> {
     for candidate_path in &candidate_paths {
         match materialize_path(&candidate_path) {
             Ok(_) => {
@@ -173,21 +173,21 @@ impl ContainsText for File {
     }
 }
 
-fn lookup(key: String) -> Result<(), Error> {
+fn lookup(key: &str) -> Result<(), Error> {
     log::debug!("Lookup: {}", &key);
     let candidate_paths = gather_candidate_read_paths(&key);
     log::debug!("Candidate paths: {:?}", candidate_paths);
     display_from_appropriate_path(candidate_paths, &key)
 }
 
-fn gather_candidate_paths(key: &String) -> Vec<PathBuf> {
+fn gather_candidate_paths(key: &str) -> Vec<PathBuf> {
     match &env::var_os(DEFINITIONS_PATH_KEY) {
         Some(paths) => expand_supplied_paths(paths, &key),
         None => expand_default_paths(&key),
     }
 }
 
-fn gather_candidate_read_paths(key: &String) -> Vec<PathBuf> {
+fn gather_candidate_read_paths(key: &str) -> Vec<PathBuf> {
     gather_candidate_paths(&key)
         .into_iter()
         .filter(|p| p.exists())
@@ -195,7 +195,7 @@ fn gather_candidate_read_paths(key: &String) -> Vec<PathBuf> {
         .collect()
 }
 
-fn display_from_appropriate_path(candidate_paths: Vec<PathBuf>, key: &String) -> Result<(), Error> {
+fn display_from_appropriate_path(candidate_paths: Vec<PathBuf>, key: &str) -> Result<(), Error> {
     // Look for the first candidate that can be read as a file and dump
     // that to the console
     for candidate_path in candidate_paths {
@@ -242,7 +242,7 @@ fn dump_file_to_output(file: File, output: &mut dyn Write) -> Result<(), Error> 
     Ok(())
 }
 
-fn expand_default_paths(key: &String) -> Vec<PathBuf> {
+fn expand_default_paths(key: &str) -> Vec<PathBuf> {
     PREFERRED_PATHS
         .to_vec()
         .into_iter()
@@ -256,7 +256,7 @@ fn expand_default_paths(key: &String) -> Vec<PathBuf> {
         .collect()
 }
 
-fn expand_supplied_paths(paths: &OsString, key: &String) -> Vec<PathBuf> {
+fn expand_supplied_paths(paths: &OsString, key: &str) -> Vec<PathBuf> {
     env::split_paths(paths)
         .into_iter()
         .map(PathBuf::from)
