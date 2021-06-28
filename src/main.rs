@@ -24,6 +24,10 @@ struct Opts {
     /// Logging level (if any)
     #[clap(short, long)]
     logs: Option<String>,
+
+    /// Disable lower-casing of dictionary keys
+    #[clap(short, long)]
+    caseful: bool,
 }
 
 static DEFAULT_LOGGING_ENV_VAR: &str = "DEFINE_LOG";
@@ -44,9 +48,15 @@ fn define() -> i32 {
 
     env_logger::Builder::from_env(Env::default().filter_or(DEFAULT_LOGGING_ENV_VAR, level)).init();
 
+    let cased_key = if options.caseful {
+        options.key
+    } else {
+        options.key.to_lowercase()
+    };
+
     let result = match options.definition {
-        None => lookup(options.key.as_str()),
-        Some(value) => store(options.key.as_str(), value.as_str()),
+        None => lookup(cased_key.as_str()),
+        Some(value) => store(cased_key.as_str(), value.as_str()),
     };
 
     match result {
