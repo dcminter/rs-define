@@ -3,7 +3,7 @@
 define \- store and lookup terms in a filesystem based dictionary
 .SH SYNOPSIS
 .B define
-[\fB\-c\fR | \fB\-\-caseful\fR] [\fB\-V\fR | \fB\-\-version\fR] [\fB\-h\fR | \fB\-\-help\fR] [\fB\-l\fR \f\Ilevel\f\R | \fB\-\-logs\fR \f\Ilevel\f\R]
+[\fB\-c\fR | \fB\-\-caseful\fR] [\fB\-V\fR | \fB\-\-version\fR] [\fB\-h\fR | \fB\-\-help\fR] [\fB\-l\fR \fIlevel\fR | \fB\-\-logs\fR \fIlevel\fR]
 .IR key
 .IR definition
 .SH DESCRIPTION
