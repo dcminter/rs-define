@@ -5,12 +5,15 @@ A simple tool for curation and lookup of definitions and for other dictionary-li
 For example:
 ```
 $ define LOTR
-No definition for 'LOTR'
+No definition for 'lotr'
 
 $ define LOTR "The Lord of the Rings"
 The Lord of the Rings
 
 $ define LOTR
+The Lord of the Rings
+
+$ define lotr
 The Lord of the Rings
 ```
 
