@@ -75,6 +75,7 @@ This is not an exhaustive list
   * ~~Colour (ANSI) output~~
   * Add an [asciinema](https://asciinema.org/) demo to the README!
   * [Normalisation](#Normalisation)
+  * Ignore attempts to add duplicate definitions
   * Tidy up any TODO issues
   * ~~Match read-paths ignoring case (i.e. currently "LOTR" != "LotR")~~ (achieved by squashing to lower-case by default, added flag to optionally disable)
 
