@@ -16,7 +16,7 @@ use regex::Regex;
 #[clap(version = env!("CARGO_PKG_VERSION"), author = env!("CARGO_PKG_AUTHORS"))]
 struct Opts {
     /// The key
-    key: String,
+    key: Option<String>,
 
     /// The value to store in the dictionary
     definition: Option<String>,
@@ -28,6 +28,10 @@ struct Opts {
     /// Disable lower-casing of dictionary keys
     #[clap(short, long)]
     caseful: bool,
+
+    /// List all known keys
+    #[clap(long)]
+    all: bool,
 }
 
 static DEFAULT_LOGGING_ENV_VAR: &str = "DEFINE_LOG";
@@ -48,27 +52,53 @@ fn define() -> i32 {
 
     env_logger::Builder::from_env(Env::default().filter_or(DEFAULT_LOGGING_ENV_VAR, level)).init();
 
-    let cased_key = if options.caseful {
-        options.key
+    // TODO: This got messy... figure out how to tidy it up!
+    let output = if options.all {
+        let _ = list_everything();
+        0
     } else {
-        options.key.to_lowercase()
-    };
+        let output = match options.key {
+            None => {
+                // TODO:
+                0
+            },
+            Some(key) => {
+                // TODO:
+                log::debug!("Key was: {}", key);
 
-    let result = match options.definition {
-        None => lookup(cased_key.as_str()),
-        Some(value) => store(cased_key.as_str(), value.as_str()),
-    };
+                let cased_key = if options.caseful {
+                    key
+                } else {
+                    key.to_lowercase()
+                };
 
-    match result {
-        Ok(_) => {
-            log::debug!("Completed OK");
-            0
-        }
-        Err(error) => {
-            log::error!("Failed: {}", error);
-            1
-        }
-    }
+                let result = match options.definition {
+                    None => lookup(cased_key.as_str()),
+                    Some(value) => store(cased_key.as_str(), value.as_str()),
+                };
+
+                let output = match result {
+                    Ok(_) => {
+                        log::debug!("Completed OK");
+                        0
+                    }
+                    Err(error) => {
+                        log::error!("Failed: {}", error);
+                        1
+                    }
+                };
+                output
+            },
+        };
+        output
+    };
+    output
+}
+
+fn list_everything() -> Result<(), Error> {
+    // TODO: Figure out how to list & display the directory contents - in lexical order!
+    log::debug!("TODO: List all the definitions");
+    Ok(())
 }
 
 fn store(key: &str, value: &str) -> Result<(), Error> {

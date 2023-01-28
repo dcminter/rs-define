@@ -66,6 +66,7 @@ This is not an exhaustive list
   * ~~Lookup directory handling and parsing~~
   * ~~Complete the basic read behaviour~~
   * ~~Proper error handling (read path) including error levels~~
+  * Add ability to list the extant definitions
   * Tests!
   * ~~Logging output~~
   * ~~Drive logging from clap parameter instead of `DEFINE_LOG`(changed default from `RUST_LOG`) (and default to completely off!)~~
