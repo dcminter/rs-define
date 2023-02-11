@@ -7,8 +7,7 @@ use std::io::{BufRead, BufReader, BufWriter, Error, ErrorKind, Seek, SeekFrom, W
 use std::path::PathBuf;
 use std::collections::HashSet;
 use std::iter::FromIterator;
-
-use ansi_term::Colour::{Green, Red};
+use ansi_term::Colour::{Green, Yellow, Red};
 use atty::Stream::{Stderr, Stdout};
 use clap::Parser;
 use clap::ArgGroup;
@@ -129,7 +128,26 @@ fn list_everything() -> Result<(), Error> {
     // TODO: At this point I need to refactor things so that I can lookup arbitrary keys! Currently
     // the lookup is expecting to get a path and do the rendering itself.
 
+    sorted_terms.iter().for_each(|term| {
+        dump_key_to_stdout(term);
+        lookup(term.as_str()).unwrap()
+    });
+
     Ok(())
+}
+
+fn dump_key_to_stdout(term: &String) {
+    // TODO: Fix error handling (return a proper error and stop using unwrap)
+    let output = &mut io::stdout();
+    let mut writer = BufWriter::new(output);
+    if atty::is(Stdout) {
+        write!(&mut writer, "{}", Yellow.prefix()).unwrap();
+    }
+    write!(&mut writer, "{}", term).unwrap();
+    write!(&mut writer, "\t").unwrap();
+    if atty::is(Stdout) {
+        write!(&mut writer, "{}", Yellow.suffix()).unwrap();
+    }
 }
 
 fn store(key: &str, value: &str) -> Result<(), Error> {
