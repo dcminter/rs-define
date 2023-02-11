@@ -1,24 +1,29 @@
+use std::{env, fs, io};
 use std::ffi::OsString;
 use std::fs::File;
 use std::fs::OpenOptions;
 use std::io::{BufRead, BufReader, BufWriter, Error, ErrorKind, Seek, SeekFrom, Write};
 use std::path::PathBuf;
-use std::{env, fs, io};
 
 use ansi_term::Colour::{Green, Red};
 use atty::Stream::{Stderr, Stdout};
+use clap::ArgGroup;
 use clap::Clap;
 use env_logger::Env;
 use regex::Regex;
 
 /// A simple tool for curation and lookup of definitions and for other dictionary-like purposes
 #[derive(Clap)]
-#[clap(version = env!("CARGO_PKG_VERSION"), author = env!("CARGO_PKG_AUTHORS"))]
+#[clap(group(ArgGroup::new("define_mode").conflicts_with("list_mode")))]
+#[clap(group(ArgGroup::new("list_mode").conflicts_with("define_mode")))]
+#[clap(version = env ! ("CARGO_PKG_VERSION"), author = env ! ("CARGO_PKG_AUTHORS"))]
 struct Opts {
     /// The key
+    #[clap(group = "define_mode")]
     key: Option<String>,
 
     /// The value to store in the dictionary
+    #[clap(group = "define_mode")]
     definition: Option<String>,
 
     /// Logging level (if any)
@@ -26,11 +31,11 @@ struct Opts {
     logs: Option<String>,
 
     /// Disable lower-casing of dictionary keys
-    #[clap(short, long)]
+    #[clap(short, long, group = "define_mode")]
     caseful: bool,
 
     /// List all known keys
-    #[clap(long)]
+    #[clap(long, group = "list_mode")]
     all: bool,
 }
 
@@ -52,6 +57,9 @@ fn define() -> i32 {
 
     env_logger::Builder::from_env(Env::default().filter_or(DEFAULT_LOGGING_ENV_VAR, level)).init();
 
+    // TODO: Let's do some validation here and then we can make the next bit cleaner:
+    if options.all && options.key.is_some() {}
+
     // TODO: This got messy... figure out how to tidy it up!
     let output = if options.all {
         let _ = list_everything();
@@ -61,7 +69,7 @@ fn define() -> i32 {
             None => {
                 // TODO:
                 0
-            },
+            }
             Some(key) => {
                 // TODO:
                 log::debug!("Key was: {}", key);
@@ -88,7 +96,7 @@ fn define() -> i32 {
                     }
                 };
                 output
-            },
+            }
         };
         output
     };
