@@ -6,6 +6,7 @@ use std::fs::OpenOptions;
 use std::io::{BufRead, BufReader, BufWriter, Error, ErrorKind, Seek, SeekFrom, Write};
 use std::path::PathBuf;
 use std::collections::HashSet;
+use std::iter::FromIterator;
 
 use ansi_term::Colour::{Green, Red};
 use atty::Stream::{Stderr, Stdout};
@@ -109,15 +110,21 @@ fn list_everything() -> Result<(), Error> {
     let possible_content_paths: Vec<PathBuf> = list_content_paths().into_iter().filter(|path| path.is_dir()).collect();
     log::debug!("Content paths (existing): {:?}", possible_content_paths);
 
-    let initial :HashSet<String> = possible_content_paths.into_iter()
+    // TODO: Error handling here is a bit sketchy
+    let terms:HashSet<String> = possible_content_paths.into_iter()
         .map(|path :PathBuf| path.read_dir().unwrap())
         .map(|directory :ReadDir | directory.map(|entry| entry.unwrap()))
         .flatten()
+        .filter(|entry| entry.file_type().unwrap().is_file())
         .map(|entry| entry.file_name())
-        .map(|entry| entry)
-        .map(|x| x.to_string_lossy().to_string())
+        .map(|name| name.to_string_lossy().to_string())
         .collect();
-    log::debug!("Refined down to unique Directory entries: {:?}", initial);
+    log::debug!("Refined down to unique term keys: {:?}", terms);
+
+    // Sort them lexically
+    let mut sorted_terms = Vec::from_iter(terms);
+    sorted_terms.sort();
+    log::debug!("Sorted terms: {:?}", sorted_terms);
 
     // TODO: At this point I need to refactor things so that I can lookup arbitrary keys! Currently
     // the lookup is expecting to get a path and do the rendering itself.
