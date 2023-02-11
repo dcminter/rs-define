@@ -7,35 +7,35 @@ use std::path::PathBuf;
 
 use ansi_term::Colour::{Green, Red};
 use atty::Stream::{Stderr, Stdout};
+use clap::Parser;
 use clap::ArgGroup;
-use clap::Clap;
 use env_logger::Env;
 use regex::Regex;
 
 /// A simple tool for curation and lookup of definitions and for other dictionary-like purposes
-#[derive(Clap)]
-#[clap(group(ArgGroup::new("define_mode").conflicts_with("list_mode")))]
+#[derive(Parser, Debug)]
+#[command(version = env ! ("CARGO_PKG_VERSION"), author = env ! ("CARGO_PKG_AUTHORS"), about, long_about = None)]
+#[clap(group(ArgGroup::new("define_mode").multiple(true).conflicts_with("list_mode")))]
 #[clap(group(ArgGroup::new("list_mode").conflicts_with("define_mode")))]
-#[clap(version = env ! ("CARGO_PKG_VERSION"), author = env ! ("CARGO_PKG_AUTHORS"))]
 struct Opts {
     /// The key
-    #[clap(group = "define_mode")]
+    #[arg(group = "define_mode")]
     key: Option<String>,
 
     /// The value to store in the dictionary
-    #[clap(group = "define_mode")]
+    #[arg(group = "define_mode")]
     definition: Option<String>,
 
     /// Logging level (if any)
-    #[clap(short, long)]
+    #[arg(short, long)]
     logs: Option<String>,
 
     /// Disable lower-casing of dictionary keys
-    #[clap(short, long, group = "define_mode")]
+    #[arg(short, long, requires = "define_mode")]
     caseful: bool,
 
     /// List all known keys
-    #[clap(long, group = "list_mode")]
+    #[arg(long, group = "list_mode")]
     all: bool,
 }
 
@@ -106,6 +106,18 @@ fn define() -> i32 {
 fn list_everything() -> Result<(), Error> {
     // TODO: Figure out how to list & display the directory contents - in lexical order!
     log::debug!("TODO: List all the definitions");
+
+    let foo = list_content_paths();
+    log::debug!("Content paths: {:?}", foo);
+
+    // How to do this:
+    // determine the valid paths (env var, or default)
+    // for each of these,
+    //   list the files that they contain
+    //   collect these into a set of names
+    // for each of the files in the collected set,
+    //   lookup the content and render
+
     Ok(())
 }
 
@@ -228,6 +240,13 @@ fn lookup(key: &str) -> Result<(), Error> {
     display_from_appropriate_path(candidate_paths, &key)
 }
 
+fn list_content_paths() -> Vec<PathBuf> {
+    match &env::var_os(DEFINITIONS_PATH_KEY) {
+        Some(paths) => expand_content_paths(paths),
+        None => expand_default_content_paths(),
+    }
+}
+
 fn gather_candidate_paths(key: &str) -> Vec<PathBuf> {
     match &env::var_os(DEFINITIONS_PATH_KEY) {
         Some(paths) => expand_supplied_paths(paths, &key),
@@ -304,6 +323,15 @@ fn expand_default_paths(key: &str) -> Vec<PathBuf> {
         .collect()
 }
 
+fn expand_default_content_paths() -> Vec<PathBuf> {
+    PREFERRED_PATHS
+        .to_vec()
+        .into_iter()
+        .map(|p| shellexpand::tilde(p).to_string())
+        .map(PathBuf::from)
+        .collect()
+}
+
 fn expand_supplied_paths(paths: &OsString, key: &str) -> Vec<PathBuf> {
     env::split_paths(paths)
         .into_iter()
@@ -313,6 +341,13 @@ fn expand_supplied_paths(paths: &OsString, key: &str) -> Vec<PathBuf> {
             paths.push(key);
             paths
         })
+        .collect()
+}
+
+fn expand_content_paths(paths: &OsString) -> Vec<PathBuf> {
+    env::split_paths(paths)
+        .into_iter()
+        .map(PathBuf::from)
         .collect()
 }
 
