@@ -1,9 +1,11 @@
 use std::{env, fs, io};
+use std::borrow::{Borrow, Cow};
 use std::ffi::OsString;
-use std::fs::File;
+use std::fs::{DirEntry, File, ReadDir};
 use std::fs::OpenOptions;
 use std::io::{BufRead, BufReader, BufWriter, Error, ErrorKind, Seek, SeekFrom, Write};
 use std::path::PathBuf;
+use std::collections::HashSet;
 
 use ansi_term::Colour::{Green, Red};
 use atty::Stream::{Stderr, Stdout};
@@ -104,19 +106,21 @@ fn define() -> i32 {
 }
 
 fn list_everything() -> Result<(), Error> {
-    // TODO: Figure out how to list & display the directory contents - in lexical order!
-    log::debug!("TODO: List all the definitions");
+    let possible_content_paths: Vec<PathBuf> = list_content_paths().into_iter().filter(|path| path.is_dir()).collect();
+    log::debug!("Content paths (existing): {:?}", possible_content_paths);
 
-    let foo = list_content_paths();
-    log::debug!("Content paths: {:?}", foo);
+    let initial :HashSet<String> = possible_content_paths.into_iter()
+        .map(|path :PathBuf| path.read_dir().unwrap())
+        .map(|directory :ReadDir | directory.map(|entry| entry.unwrap()))
+        .flatten()
+        .map(|entry| entry.file_name())
+        .map(|entry| entry)
+        .map(|x| x.to_string_lossy().to_string())
+        .collect();
+    log::debug!("Refined down to unique Directory entries: {:?}", initial);
 
-    // How to do this:
-    // determine the valid paths (env var, or default)
-    // for each of these,
-    //   list the files that they contain
-    //   collect these into a set of names
-    // for each of the files in the collected set,
-    //   lookup the content and render
+    // TODO: At this point I need to refactor things so that I can lookup arbitrary keys! Currently
+    // the lookup is expecting to get a path and do the rendering itself.
 
     Ok(())
 }
