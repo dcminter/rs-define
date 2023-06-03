@@ -1,17 +1,17 @@
-use std::{env, fs, io};
-use std::ffi::OsString;
-use std::fs::{File, ReadDir};
-use std::fs::OpenOptions;
-use std::io::{BufRead, BufReader, BufWriter, Error, ErrorKind, Seek, SeekFrom, Write};
-use std::path::PathBuf;
-use std::collections::HashSet;
-use std::iter::FromIterator;
-use ansi_term::Colour::{Green, Yellow, Red};
+use ansi_term::Colour::{Green, Red, Yellow};
 use atty::Stream::{Stderr, Stdout};
-use clap::Parser;
 use clap::ArgGroup;
+use clap::{Parser, ValueEnum};
 use env_logger::Env;
 use regex::Regex;
+use std::collections::HashSet;
+use std::ffi::OsString;
+use std::fs::OpenOptions;
+use std::fs::{File, ReadDir};
+use std::io::{BufRead, BufReader, BufWriter, Error, ErrorKind, Seek, SeekFrom, Write};
+use std::iter::FromIterator;
+use std::path::PathBuf;
+use std::{env, fs, io};
 
 /// A simple tool for curation and lookup of definitions and for other dictionary-like purposes
 #[derive(Parser, Debug)]
@@ -35,9 +35,14 @@ struct Opts {
     #[arg(short, long, requires = "define_mode")]
     caseful: bool,
 
-    /// List all known keys
+    /// List all known keys (with optional output formatting)
     #[arg(long, group = "list_mode")]
-    all: bool,
+    all: Option<Option<Format>>,
+}
+
+#[derive(Debug, Copy, Clone, PartialEq, Eq, PartialOrd, Ord, ValueEnum)]
+enum Format {
+    Markdown,
 }
 
 static DEFAULT_LOGGING_ENV_VAR: &str = "DEFINE_LOG";
@@ -58,60 +63,123 @@ fn define() -> i32 {
 
     env_logger::Builder::from_env(Env::default().filter_or(DEFAULT_LOGGING_ENV_VAR, level)).init();
 
-    // TODO: Let's do some validation here and then we can make the next bit cleaner:
-    if options.all && options.key.is_some() {}
-
     // TODO: This got messy... figure out how to tidy it up!
-    let output = if options.all {
-        let _ = list_everything();
-        0
-    } else {
-        let output = match options.key {
-            None => {
-                // TODO:
-                0
-            }
-            Some(key) => {
-                // TODO:
-                log::debug!("Key was: {}", key);
-
-                let cased_key = if options.caseful {
-                    key
-                } else {
-                    key.to_lowercase()
-                };
-
-                let result = match options.definition {
-                    None => lookup(cased_key.as_str()),
-                    Some(value) => store(cased_key.as_str(), value.as_str()),
-                };
-
-                let output = match result {
-                    Ok(_) => {
-                        log::debug!("Completed OK");
+    let output: i32 = match options.all {
+        Some(all) => {
+            let output = match all {
+                Some(format) => match format {
+                    Format::Markdown => {
+                        let _ = list_everything_markdown();
                         0
                     }
-                    Err(error) => {
-                        log::error!("Failed: {}", error);
-                        1
-                    }
-                };
-                output
-            }
-        };
-        output
+                },
+                None => {
+                    let _ = list_everything(); // TODO: Handle the error properly
+                    0
+                }
+            };
+            output
+        }
+        None => {
+            let output = match options.key {
+                None => {
+                    // TODO:
+                    0
+                }
+                Some(key) => {
+                    // TODO:
+                    log::debug!("Key was: {}", key);
+
+                    let cased_key = if options.caseful {
+                        key
+                    } else {
+                        key.to_lowercase()
+                    };
+
+                    let result = match options.definition {
+                        None => lookup(cased_key.as_str()),
+                        Some(value) => store(cased_key.as_str(), value.as_str()),
+                    };
+
+                    let output = match result {
+                        Ok(_) => {
+                            log::debug!("Completed OK");
+                            0
+                        }
+                        Err(error) => {
+                            log::error!("Failed: {}", error);
+                            1
+                        }
+                    };
+                    output
+                }
+            };
+            output
+        }
     };
     output
 }
 
+fn list_everything_markdown() -> Result<(), Error> {
+    // TODO: Make header texts configurable?
+    // TODO: Pad things to be visually nice and neat?
+    println!("| Term | Definition |");
+    println!("| ---- | ---------- |");
+    process_everything(&|term| {
+        println!(
+            "|{}|{}|",
+            term,
+            multiline_to_html_br(load_term_content(term)?.as_str())?
+        );
+        Ok(())
+    })
+}
+
+fn load_term_content(value: &str) -> Result<String, Error> {
+    match lookup_content(value)? {
+        Some(content) => Ok(content),
+        None => Err(Error::from(ErrorKind::NotFound)),
+    }
+}
+
+fn multiline_to_html_br(value: &str) -> Result<String, Error> {
+    let mut collated = String::new();
+
+    // Can we do this in a tidier way with collation?
+    if value.lines().count() < 2 {
+        collated.push_str(value.trim());
+    } else {
+        value.lines().for_each(|line| {
+            collated.push_str(line);
+            collated.push_str("<br>");
+        });
+    }
+
+    Ok(collated)
+}
+
 fn list_everything() -> Result<(), Error> {
-    let possible_content_paths: Vec<PathBuf> = list_content_paths().into_iter().filter(|path| path.is_dir()).collect();
+    process_everything(&|term| {
+        dump_key_to_stdout(term);
+        // TODO: At this point I need to refactor things so that I can lookup arbitrary keys! Currently
+        // the lookup is expecting to get a path and do the rendering itself.
+        Ok(lookup(term.as_str()).unwrap())
+    })
+}
+
+// TODO: Extract a more general method that can accept alternative output formatting
+fn process_everything(handle_term: &dyn Fn(&String) -> Result<(), Error>) -> Result<(), Error> {
+    let possible_content_paths: Vec<PathBuf> = list_content_paths()
+        .into_iter()
+        .filter(|path| path.is_dir())
+        .collect();
     log::debug!("Content paths (existing): {:?}", possible_content_paths);
 
     // TODO: Error handling here is a bit sketchy
-    let terms:HashSet<String> = possible_content_paths.into_iter()
-        .map(|path :PathBuf| path.read_dir().unwrap())
-        .map(|directory :ReadDir | directory.map(|entry| entry.unwrap()))
+    let terms: HashSet<String> = possible_content_paths
+        .into_iter()
+        .map(|path: PathBuf| path.read_dir().unwrap())
+        .map(|directory: ReadDir| directory.map(|entry| entry.unwrap()))
         .flatten()
         .filter(|entry| entry.file_type().unwrap().is_file())
         .map(|entry| entry.file_name())
@@ -124,13 +192,8 @@ fn list_everything() -> Result<(), Error> {
     sorted_terms.sort();
     log::debug!("Sorted terms: {:?}", sorted_terms);
 
-    // TODO: At this point I need to refactor things so that I can lookup arbitrary keys! Currently
-    // the lookup is expecting to get a path and do the rendering itself.
-
-    sorted_terms.iter().for_each(|term| {
-        dump_key_to_stdout(term);
-        lookup(term.as_str()).unwrap()
-    });
+    // Handle each term in turn
+    sorted_terms.iter().try_for_each(handle_term)?;
 
     Ok(())
 }
@@ -268,6 +331,13 @@ fn lookup(key: &str) -> Result<(), Error> {
     display_from_appropriate_path(candidate_paths, &key)
 }
 
+fn lookup_content(key: &str) -> Result<Option<String>, Error> {
+    log::debug!("Lookup: {}", &key);
+    let candidate_paths = gather_candidate_read_paths(&key);
+    log::debug!("Candidate paths: {:?}", candidate_paths);
+    load_from_appropriate_path(candidate_paths)
+}
+
 fn list_content_paths() -> Vec<PathBuf> {
     match &env::var_os(DEFINITIONS_PATH_KEY) {
         Some(paths) => expand_content_paths(paths),
@@ -288,6 +358,21 @@ fn gather_candidate_read_paths(key: &str) -> Vec<PathBuf> {
         .filter(|p| p.exists())
         .filter(|p| p.is_file())
         .collect()
+}
+
+fn load_from_appropriate_path(candidate_paths: Vec<PathBuf>) -> Result<Option<String>, Error> {
+    // Look for the first candidate that can be read as a file and dump
+    // that to the console
+    for candidate_path in candidate_paths {
+        match File::open(&candidate_path) {
+            Err(error) => log::debug!("Error {:?} for path {:?}", error, &candidate_path),
+            Ok(_) => {
+                log::debug!("Success for path {:?}", &candidate_path);
+                return Ok(Some(fs::read_to_string(candidate_path)?));
+            }
+        }
+    }
+    Ok(None)
 }
 
 fn display_from_appropriate_path(candidate_paths: Vec<PathBuf>, key: &str) -> Result<(), Error> {
