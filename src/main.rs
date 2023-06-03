@@ -1,7 +1,6 @@
 use std::{env, fs, io};
-use std::borrow::{Borrow, Cow};
 use std::ffi::OsString;
-use std::fs::{DirEntry, File, ReadDir};
+use std::fs::{File, ReadDir};
 use std::fs::OpenOptions;
 use std::io::{BufRead, BufReader, BufWriter, Error, ErrorKind, Seek, SeekFrom, Write};
 use std::path::PathBuf;
