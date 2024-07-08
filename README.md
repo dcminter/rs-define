@@ -53,7 +53,7 @@ This is not an exhaustive list
   * ~~Lookup directory handling and parsing~~
   * ~~Complete the basic read behaviour~~
   * ~~Proper error handling (read path) including error levels~~
-  * Add ability to list the extant definitions
+  * ~~Add ability to list the extant definitions~~
   * Tests!
   * ~~Logging output~~
   * ~~Drive logging from clap parameter instead of `DEFINE_LOG`(changed default from `RUST_LOG`) (and default to completely off!)~~
@@ -69,10 +69,14 @@ This is not an exhaustive list
 
 ## Future features
 
+  * Tools to delete definitions (bumped to top priority as this is actually a feature I would use if I'd implemented it!)
+    * At the moment when using the tool personally I go into the `~/.config/define` directory and delete the file manually; not ideal!
   * Namespacing
+    * My thinking here is that one might wish to distinguish between definitions in various context, so that for example `define bff --context social-media` might output 'Best Friends Forever' but `define bff --context development` might output 'Backend For Frontend' ... but that's very clunky and does it add enough value to be worth bothering? Something to ponder. 
   * Allow for hosting of definitions on a remote server instead of, or as well as, in the local filesystem.
+    * I'm torn between a custom protocol (which is more fun) and just using Redis or something similar that already exists.
   * Maybe fix up for Windows as well as Linux?
-  * Tools to delete definitions
+    * Although I don't have a Windows machine or want one, so maybe not. Besides, maybe it already works ok? Let me know if you know.
 
 ## Error codes
 
