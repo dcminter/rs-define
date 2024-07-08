@@ -2,25 +2,12 @@
 
 A simple tool for curation and lookup of definitions and for other dictionary-like purposes
 
-For example:
-```
-$ define LOTR
-No definition for 'lotr'
-
-$ define LOTR "The Lord of the Rings"
-The Lord of the Rings
-
-$ define LOTR
-The Lord of the Rings
-
-$ define lotr
-The Lord of the Rings
-```
+![Asciinema animation of rs-define in action](docs/rs-define.gif?raw=true "rs-define in action")
 
 This is a reimplementation (and enhancement) of a [stupid bash script](https://github.com/dcminter/define) I created 
 and used fairly regularly in my latest assignment.
 
-The new implentation is in [Rust](https://www.rust-lang.org/) mostly as a personal learning exercise!
+The new implementation is in [Rust](https://www.rust-lang.org/) mostly as a personal learning exercise!
 
 ## Specification
 
@@ -74,7 +61,7 @@ This is not an exhaustive list
   * ~~Handle the directory not existing during when storing a value (attempt to create)~~
   * ~~Proper error handling (write path) including error levels~~
   * ~~Colour (ANSI) output~~
-  * Add an [asciinema](https://asciinema.org/) demo to the README!
+  * ~~Add an [asciinema](https://asciinema.org/) demo to the README!~~
   * [Normalisation](#Normalisation)
   * Ignore attempts to add duplicate definitions
   * Tidy up any TODO issues
