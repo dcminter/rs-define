@@ -5,10 +5,11 @@ use clap::{Parser, ValueEnum};
 use env_logger::Env;
 use regex::Regex;
 use std::collections::HashSet;
+use std::error::Error;
 use std::ffi::OsString;
 use std::fs::OpenOptions;
 use std::fs::{File, ReadDir};
-use std::io::{BufRead, BufReader, BufWriter, Error, ErrorKind, Seek, SeekFrom, Write};
+use std::io::{BufRead, BufReader, BufWriter, ErrorKind, Seek, SeekFrom, Write};
 use std::iter::FromIterator;
 use std::path::PathBuf;
 use std::{env, fs, io};
@@ -120,7 +121,7 @@ fn define() -> i32 {
     output
 }
 
-fn list_everything_markdown() -> Result<(), Error> {
+fn list_everything_markdown() -> Result<(), Box<dyn Error>> {
     // TODO: Make header texts configurable?
     // TODO: Pad things to be visually nice and neat?
     println!("| Term | Definition |");
@@ -135,14 +136,14 @@ fn list_everything_markdown() -> Result<(), Error> {
     })
 }
 
-fn load_term_content(value: &str) -> Result<String, Error> {
+fn load_term_content(value: &str) -> Result<String, Box<dyn Error>> {
     match lookup_content(value)? {
         Some(content) => Ok(content),
-        None => Err(Error::from(ErrorKind::NotFound)),
+        None => Err(std::io::Error::from(ErrorKind::NotFound).into())
     }
 }
 
-fn multiline_to_html_br(value: &str) -> Result<String, Error> {
+fn multiline_to_html_br(value: &str) -> Result<String, Box<dyn Error>> {
     let mut collated = String::new();
 
     // Can we do this in a tidier way with collation?
@@ -158,17 +159,17 @@ fn multiline_to_html_br(value: &str) -> Result<String, Error> {
     Ok(collated)
 }
 
-fn list_everything() -> Result<(), Error> {
+fn list_everything() -> Result<(), Box<dyn Error>> {
     process_everything(&|term| {
-        dump_key_to_stdout(term);
+        dump_key_to_stdout(term)?;
         // TODO: At this point I need to refactor things so that I can lookup arbitrary keys! Currently
         // the lookup is expecting to get a path and do the rendering itself.
-        Ok(lookup(term.as_str()).unwrap())
+        Ok(lookup(term.as_str())?)
     })
 }
 
 // TODO: Extract a more general method that can accept alternative output formatting
-fn process_everything(handle_term: &dyn Fn(&String) -> Result<(), Error>) -> Result<(), Error> {
+fn process_everything(handle_term: &dyn Fn(&String) -> Result<(), Box<dyn Error>>) -> Result<(), Box<dyn Error>> {
     let possible_content_paths: Vec<PathBuf> = list_content_paths()
         .into_iter()
         .filter(|path| path.is_dir())
@@ -198,21 +199,22 @@ fn process_everything(handle_term: &dyn Fn(&String) -> Result<(), Error>) -> Res
     Ok(())
 }
 
-fn dump_key_to_stdout(term: &String) {
+fn dump_key_to_stdout(term: &String) -> Result<(), Box<dyn Error>> {
     // TODO: Fix error handling (return a proper error and stop using unwrap)
     let output = &mut io::stdout();
     let mut writer = BufWriter::new(output);
     if atty::is(Stdout) {
-        write!(&mut writer, "{}", Yellow.prefix()).unwrap();
+        write!(&mut writer, "{}", Yellow.prefix())?;
     }
     write!(&mut writer, "{}", term).unwrap();
     write!(&mut writer, "\t").unwrap();
     if atty::is(Stdout) {
-        write!(&mut writer, "{}", Yellow.suffix()).unwrap();
+        write!(&mut writer, "{}", Yellow.suffix())?;
     }
+    Ok(())
 }
 
-fn store(key: &str, value: &str) -> Result<(), Error> {
+fn store(key: &str, value: &str) -> Result<(), Box<dyn Error>> {
     log::debug!("Will store: {} with key {}", value, key);
 
     let candidate_paths = gather_candidate_paths(&key);
@@ -221,7 +223,7 @@ fn store(key: &str, value: &str) -> Result<(), Error> {
     store_on_appropriate_path(candidate_paths, value)
 }
 
-fn store_on_appropriate_path(candidate_paths: Vec<PathBuf>, value: &str) -> Result<(), Error> {
+fn store_on_appropriate_path(candidate_paths: Vec<PathBuf>, value: &str) -> Result<(), Box<dyn Error>> {
     for candidate_path in &candidate_paths {
         match materialize_path(&candidate_path) {
             Ok(_) => {
@@ -268,10 +270,10 @@ fn store_on_appropriate_path(candidate_paths: Vec<PathBuf>, value: &str) -> Resu
     }
 
     // Is this errorkind sensible?
-    Err(Error::from(ErrorKind::NotFound))
+    Err(std::io::Error::from(ErrorKind::NotFound).into())
 }
 
-fn materialize_path(path: &PathBuf) -> Result<(), Error> {
+fn materialize_path(path: &PathBuf) -> Result<(), Box<dyn Error>> {
     log::debug!(
         "Create the path {} if that seems necessary",
         path.to_string_lossy()
@@ -295,7 +297,7 @@ fn materialize_path(path: &PathBuf) -> Result<(), Error> {
                         "Parent path {} doesn't exist - trying to create it",
                         parent.to_string_lossy()
                     );
-                    fs::create_dir_all(parent)
+                    Ok(fs::create_dir_all(parent)?)
                 }
             }
             None => Ok(()),
@@ -324,14 +326,14 @@ impl ContainsText for File {
     }
 }
 
-fn lookup(key: &str) -> Result<(), Error> {
+fn lookup(key: &str) -> Result<(), Box<dyn Error>> {
     log::debug!("Lookup: {}", &key);
     let candidate_paths = gather_candidate_read_paths(&key);
     log::debug!("Candidate paths: {:?}", candidate_paths);
     display_from_appropriate_path(candidate_paths, &key)
 }
 
-fn lookup_content(key: &str) -> Result<Option<String>, Error> {
+fn lookup_content(key: &str) -> Result<Option<String>, Box<dyn Error>> {
     log::debug!("Lookup: {}", &key);
     let candidate_paths = gather_candidate_read_paths(&key);
     log::debug!("Candidate paths: {:?}", candidate_paths);
@@ -360,7 +362,7 @@ fn gather_candidate_read_paths(key: &str) -> Vec<PathBuf> {
         .collect()
 }
 
-fn load_from_appropriate_path(candidate_paths: Vec<PathBuf>) -> Result<Option<String>, Error> {
+fn load_from_appropriate_path(candidate_paths: Vec<PathBuf>) -> Result<Option<String>, Box<dyn Error>> {
     // Look for the first candidate that can be read as a file and dump
     // that to the console
     for candidate_path in candidate_paths {
@@ -375,7 +377,7 @@ fn load_from_appropriate_path(candidate_paths: Vec<PathBuf>) -> Result<Option<St
     Ok(None)
 }
 
-fn display_from_appropriate_path(candidate_paths: Vec<PathBuf>, key: &str) -> Result<(), Error> {
+fn display_from_appropriate_path(candidate_paths: Vec<PathBuf>, key: &str) -> Result<(), Box<dyn Error>> {
     // Look for the first candidate that can be read as a file and dump
     // that to the console
     for candidate_path in candidate_paths {
@@ -400,10 +402,10 @@ fn display_from_appropriate_path(candidate_paths: Vec<PathBuf>, key: &str) -> Re
             key.to_string()
         }
     );
-    Err(Error::from(ErrorKind::NotFound))
+    Err(std::io::Error::from(ErrorKind::NotFound).into())
 }
 
-fn dump_file_to_output(file: File, output: &mut dyn Write) -> Result<(), Error> {
+fn dump_file_to_output(file: File, output: &mut dyn Write) -> Result<(), Box <dyn Error>> {
     let mut reader = BufReader::new(file);
     let mut writer = BufWriter::new(output);
     if atty::is(Stdout) {
@@ -412,7 +414,7 @@ fn dump_file_to_output(file: File, output: &mut dyn Write) -> Result<(), Error> 
     match io::copy(&mut reader, &mut writer) {
         Err(err) => {
             eprintln!("ERROR: failed {:?}", err);
-            return Err(err);
+            return Err(err.into());
         }
         Ok(value) => log::debug!("Ok, wrote {} bytes", value),
     }
