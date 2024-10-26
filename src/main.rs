@@ -110,6 +110,7 @@ fn define() -> i32 {
                                 0
                             }
                             Err(error) => {
+                                eprintln!("Could not delete the definition due to: {}", error);
                                 log::error!("Failed: {}", error);
                                 1
                             }
