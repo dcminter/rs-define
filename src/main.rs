@@ -16,7 +16,8 @@ use std::{env, fs, io};
 
 /// A simple tool for curation and lookup of definitions and for other dictionary-like purposes
 #[derive(Parser, Debug)]
-#[command(version = env ! ("CARGO_PKG_VERSION"), author = env ! ("CARGO_PKG_AUTHORS"), about, long_about = None)]
+#[command(version = env ! ("CARGO_PKG_VERSION"), author = env ! ("CARGO_PKG_AUTHORS"), about, long_about = None
+)]
 #[clap(group(ArgGroup::new("define_mode").multiple(true).conflicts_with("list_mode")))]
 #[clap(group(ArgGroup::new("list_mode").conflicts_with("define_mode")))]
 struct Opts {
@@ -35,6 +36,10 @@ struct Opts {
     /// Disable lower-casing of dictionary keys
     #[arg(short, long, requires = "define_mode")]
     caseful: bool,
+
+    /// Delete the definition(s) with the given key
+    #[arg(short, long, requires = "key")]
+    delete: bool,
 
     /// List all known keys (with optional output formatting)
     #[arg(long, group = "list_mode")]
@@ -65,7 +70,7 @@ fn define() -> i32 {
     env_logger::Builder::from_env(Env::default().filter_or(DEFAULT_LOGGING_ENV_VAR, level)).init();
 
     // TODO: This got messy... figure out how to tidy it up!
-    let output: i32 = match options.all {
+    match options.all {
         Some(all) => {
             let output = match all {
                 Some(format) => match format {
@@ -82,7 +87,7 @@ fn define() -> i32 {
             output
         }
         None => {
-            let output = match options.key {
+            match options.key {
                 None => {
                     // TODO:
                     0
@@ -97,28 +102,39 @@ fn define() -> i32 {
                         key.to_lowercase()
                     };
 
-                    let result = match options.definition {
-                        None => lookup(cased_key.as_str()),
-                        Some(value) => store(cased_key.as_str(), value.as_str()),
-                    };
+                    if options.delete {
+                        log::debug!("The deletion flag is set");
+                        match delete(cased_key.as_str()) {
+                            Ok(_) => {
+                                log::debug!("Completed OK");
+                                0
+                            }
+                            Err(error) => {
+                                log::error!("Failed: {}", error);
+                                1
+                            }
+                        }
+                    } else {
+                        let result = match options.definition {
+                            None => lookup(cased_key.as_str()),
+                            Some(value) => store(cased_key.as_str(), value.as_str()),
+                        };
 
-                    let output = match result {
-                        Ok(_) => {
-                            log::debug!("Completed OK");
-                            0
+                        match result {
+                            Ok(_) => {
+                                log::debug!("Completed OK");
+                                0
+                            }
+                            Err(error) => {
+                                log::error!("Failed: {}", error);
+                                1
+                            }
                         }
-                        Err(error) => {
-                            log::error!("Failed: {}", error);
-                            1
-                        }
-                    };
-                    output
+                    }
                 }
-            };
-            output
+            }
         }
-    };
-    output
+    }
 }
 
 fn list_everything_markdown() -> Result<(), Box<dyn Error>> {
@@ -326,6 +342,36 @@ impl ContainsText for File {
     }
 }
 
+fn delete(key: &str) -> Result<(), Box<dyn Error>> {
+    log::debug!("Lookup: {}", &key);
+    let candidate_paths = gather_candidate_read_paths(&key);
+    log::debug!("Candidate paths: {:?}", candidate_paths);
+
+    match candidate_paths.first() {
+        Some(path) => {
+            /*
+                If there is at least one path then we will try to delete the first path - if we succeed
+                that is success, if we fail that is an error. If the term is defined in more than one
+                place it will still be available after this operation!
+             */
+            fs::remove_file(path.as_path())?;
+            Ok(())
+        },
+        None => {
+            // If there are NO paths then we cannot delete and we will treat that as an error
+            eprintln!(
+                "No candidate definition of '{}' found for deletion",
+                if atty::is(Stderr) {
+                    Red.paint(key).to_string()
+                } else {
+                    key.to_string()
+                }
+            );
+            Err("No candidate definitions for deletion".into())
+        }
+    }
+}
+
 fn lookup(key: &str) -> Result<(), Box<dyn Error>> {
     log::debug!("Lookup: {}", &key);
     let candidate_paths = gather_candidate_read_paths(&key);
@@ -405,7 +451,7 @@ fn display_from_appropriate_path(candidate_paths: Vec<PathBuf>, key: &str) -> Re
     Err(std::io::Error::from(ErrorKind::NotFound).into())
 }
 
-fn dump_file_to_output(file: File, output: &mut dyn Write) -> Result<(), Box <dyn Error>> {
+fn dump_file_to_output(file: File, output: &mut dyn Write) -> Result<(), Box<dyn Error>> {
     let mut reader = BufReader::new(file);
     let mut writer = BufWriter::new(output);
     if atty::is(Stdout) {

@@ -66,11 +66,10 @@ This is not an exhaustive list
   * Ignore attempts to add duplicate definitions
   * Tidy up any TODO issues
   * ~~Match read-paths ignoring case (i.e. currently "LOTR" != "LotR")~~ (achieved by squashing to lower-case by default, added flag to optionally disable)
+  * ~~Basic deletion capability~~
 
 ## Future features
 
-  * Tools to delete definitions (bumped to top priority as this is actually a feature I would use if I'd implemented it!)
-    * At the moment when using the tool personally I go into the `~/.config/define` directory and delete the file manually; not ideal!
   * Namespacing
     * My thinking here is that one might wish to distinguish between definitions in various context, so that for example `define bff --context social-media` might output 'Best Friends Forever' but `define bff --context development` might output 'Backend For Frontend' ... but that's very clunky and does it add enough value to be worth bothering? Something to ponder. 
   * Allow for hosting of definitions on a remote server instead of, or as well as, in the local filesystem.
