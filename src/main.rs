@@ -38,7 +38,7 @@ struct Opts {
     caseful: bool,
 
     /// Delete the definition(s) with the given key
-    #[arg(short, long, requires = "key")]
+    #[arg(short, long, requires = "key", conflicts_with = "definition")]
     delete: bool,
 
     /// List all known keys (with optional output formatting)
@@ -156,7 +156,7 @@ fn list_everything_markdown() -> Result<(), Box<dyn Error>> {
 fn load_term_content(value: &str) -> Result<String, Box<dyn Error>> {
     match lookup_content(value)? {
         Some(content) => Ok(content),
-        None => Err(std::io::Error::from(ErrorKind::NotFound).into())
+        None => Err(std::io::Error::from(ErrorKind::NotFound).into()),
     }
 }
 
@@ -186,7 +186,9 @@ fn list_everything() -> Result<(), Box<dyn Error>> {
 }
 
 // TODO: Extract a more general method that can accept alternative output formatting
-fn process_everything(handle_term: &dyn Fn(&String) -> Result<(), Box<dyn Error>>) -> Result<(), Box<dyn Error>> {
+fn process_everything(
+    handle_term: &dyn Fn(&String) -> Result<(), Box<dyn Error>>,
+) -> Result<(), Box<dyn Error>> {
     let possible_content_paths: Vec<PathBuf> = list_content_paths()
         .into_iter()
         .filter(|path| path.is_dir())
@@ -240,7 +242,10 @@ fn store(key: &str, value: &str) -> Result<(), Box<dyn Error>> {
     store_on_appropriate_path(candidate_paths, value)
 }
 
-fn store_on_appropriate_path(candidate_paths: Vec<PathBuf>, value: &str) -> Result<(), Box<dyn Error>> {
+fn store_on_appropriate_path(
+    candidate_paths: Vec<PathBuf>,
+    value: &str,
+) -> Result<(), Box<dyn Error>> {
     for candidate_path in &candidate_paths {
         match materialize_path(&candidate_path) {
             Ok(_) => {
@@ -351,13 +356,13 @@ fn delete(key: &str) -> Result<(), Box<dyn Error>> {
     match candidate_paths.first() {
         Some(path) => {
             /*
-                If there is at least one path then we will try to delete the first path - if we succeed
-                that is success, if we fail that is an error. If the term is defined in more than one
-                place it will still be available after this operation!
-             */
+               If there is at least one path then we will try to delete the first path - if we succeed
+               that is success, if we fail that is an error. If the term is defined in more than one
+               place it will still be available after this operation!
+            */
             fs::remove_file(path.as_path())?;
             Ok(())
-        },
+        }
         None => {
             // If there are NO paths then we cannot delete and we will treat that as an error
             eprintln!(
@@ -409,7 +414,9 @@ fn gather_candidate_read_paths(key: &str) -> Vec<PathBuf> {
         .collect()
 }
 
-fn load_from_appropriate_path(candidate_paths: Vec<PathBuf>) -> Result<Option<String>, Box<dyn Error>> {
+fn load_from_appropriate_path(
+    candidate_paths: Vec<PathBuf>,
+) -> Result<Option<String>, Box<dyn Error>> {
     // Look for the first candidate that can be read as a file and dump
     // that to the console
     for candidate_path in candidate_paths {
@@ -424,7 +431,10 @@ fn load_from_appropriate_path(candidate_paths: Vec<PathBuf>) -> Result<Option<St
     Ok(None)
 }
 
-fn display_from_appropriate_path(candidate_paths: Vec<PathBuf>, key: &str) -> Result<(), Box<dyn Error>> {
+fn display_from_appropriate_path(
+    candidate_paths: Vec<PathBuf>,
+    key: &str,
+) -> Result<(), Box<dyn Error>> {
     // Look for the first candidate that can be read as a file and dump
     // that to the console
     for candidate_path in candidate_paths {

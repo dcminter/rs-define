@@ -38,6 +38,30 @@ found (or a user writeable file can be created).
   * If the [normalised](#normalisation) copy of the second parameter is not found then it is appended as a new line to the file.
   * The normalised copy of the second parameter is then written to stdout and the program exits with a success code.
 
+### Deleting
+
+The `--delete` option can be used to delete an existing defition, starting with the "closest" definition in the
+ definitions paths. Note that if a single path entry for a term contains multiple definitions of the term then all of 
+the definitions in the closest entry will be deleted.
+
+For example:
+
+```bash
+$ define lol
+No definition found for 'lol'
+$ define lol 'Laugh Out Loud'
+Laugh Out Loud
+$ define lol 'Lots of Love'
+Laugh Out Loud
+Lots of Love
+$ define lol
+Laugh Out Loud
+Lots of Love
+$ define --delete lol
+$ define lol
+No definition found for 'lol'
+```
+
 ### Normalisation
 
 *Not yet implemented*
