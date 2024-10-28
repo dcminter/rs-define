@@ -108,16 +108,17 @@ fn handle_top_level_error(result: Result<(), Box<dyn Error>>) -> i32 {
         Err(e) => {
             log::error!("{}", e);
             let message = e.to_string();
-
-            let prefix = if atty::is(Stderr) {
-                Red.paint("Error").to_string()
-            } else {
-                "Error".to_string()
-            };
-
-            eprintln!("{}: {}", prefix, message);
+            eprintln!("{}: {}", error_paint("Error"), message);
             1
         }
+    }
+}
+
+fn error_paint(text: &str) -> String {
+    if atty::is(Stderr) {
+        Red.paint(text).to_string()
+    } else {
+        text.to_string()
     }
 }
 
@@ -357,11 +358,7 @@ fn delete(key: &str) -> Result<(), Box<dyn Error>> {
             // If there are NO paths then we cannot delete and we will treat that as an error
             eprintln!(
                 "No candidate definition of '{}' found for deletion",
-                if atty::is(Stderr) {
-                    Red.paint(key).to_string()
-                } else {
-                    key.to_string()
-                }
+                error_paint(key)
             );
             Err("No candidate definitions for deletion".into())
         }
@@ -441,14 +438,7 @@ fn display_from_appropriate_path(
     // Is there a smart way to colour the whole string but still allow pattern
     // substitution? Also is there a better way to turn it off if we're not
     // talking to a tty?
-    let message = format!(
-        "No definition found for '{}'",
-        if atty::is(Stderr) {
-            Red.paint(key).to_string()
-        } else {
-            key.to_string()
-        }
-    );
+    let message = format!("No definition found for '{}'", error_paint(key));
     Err(message.into())
 }
 
