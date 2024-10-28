@@ -210,14 +210,13 @@ fn process_everything(
 }
 
 fn dump_key_to_stdout(term: &String) -> Result<(), Box<dyn Error>> {
-    // TODO: Fix error handling (return a proper error and stop using unwrap)
     let output = &mut io::stdout();
     let mut writer = BufWriter::new(output);
     if atty::is(Stdout) {
         write!(&mut writer, "{}", Yellow.prefix())?;
     }
-    write!(&mut writer, "{}", term).unwrap();
-    write!(&mut writer, "\t").unwrap();
+    write!(&mut writer, "{}", term)?;
+    write!(&mut writer, "\t")?;
     if atty::is(Stdout) {
         write!(&mut writer, "{}", Yellow.suffix())?;
     }
