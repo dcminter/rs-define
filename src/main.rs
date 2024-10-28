@@ -48,6 +48,7 @@ struct Opts {
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq, PartialOrd, Ord, ValueEnum)]
 enum Format {
+    Text,
     Markdown,
 }
 
@@ -69,71 +70,53 @@ fn define() -> i32 {
 
     env_logger::Builder::from_env(Env::default().filter_or(DEFAULT_LOGGING_ENV_VAR, level)).init();
 
-    // TODO: This got messy... figure out how to tidy it up!
-    match options.all {
-        Some(all) => {
-            let output = match all {
-                Some(format) => match format {
-                    Format::Markdown => {
-                        let _ = list_everything_markdown();
-                        0
-                    }
-                },
-                None => {
-                    let _ = list_everything(); // TODO: Handle the error properly
-                    0
-                }
-            };
-            output
-        }
-        None => {
-            match options.key {
-                None => {
-                    // TODO:
-                    0
-                }
-                Some(key) => {
-                    // TODO:
-                    log::debug!("Key was: {}", key);
+    let result = match options.all {
+        Some(all) => match all {
+            Some(format) => list_everything(format),
+            None => list_everything(Format::Text),
+        },
+        None => match options.key {
+            Some(key) => {
+                log::debug!("Key was: {}", key);
 
-                    let cased_key = if options.caseful {
-                        key
-                    } else {
-                        key.to_lowercase()
-                    };
+                let cased_key = if options.caseful {
+                    key
+                } else {
+                    key.to_lowercase()
+                };
 
-                    if options.delete {
-                        log::debug!("The deletion flag is set");
-                        match delete(cased_key.as_str()) {
-                            Ok(_) => {
-                                log::debug!("Completed OK");
-                                0
-                            }
-                            Err(error) => {
-                                eprintln!("Could not delete the definition due to: {}", error);
-                                log::error!("Failed: {}", error);
-                                1
-                            }
-                        }
-                    } else {
-                        let result = match options.definition {
-                            None => lookup(cased_key.as_str()),
-                            Some(value) => store(cased_key.as_str(), value.as_str()),
-                        };
-
-                        match result {
-                            Ok(_) => {
-                                log::debug!("Completed OK");
-                                0
-                            }
-                            Err(error) => {
-                                log::error!("Failed: {}", error);
-                                1
-                            }
-                        }
+                if options.delete {
+                    log::debug!("The deletion flag is set");
+                    delete(cased_key.as_str())
+                } else {
+                    match options.definition {
+                        None => lookup(cased_key.as_str()),
+                        Some(value) => store(cased_key.as_str(), value.as_str()),
                     }
                 }
             }
+            None => Err("No definition KEY was supplied: ".into()),
+        },
+    };
+
+    handle_top_level_error(result)
+}
+
+fn handle_top_level_error(result: Result<(), Box<dyn Error>>) -> i32 {
+    match result {
+        Ok(()) => 0,
+        Err(e) => {
+            log::error!("{}", e);
+            let message = e.to_string();
+
+            let prefix = if atty::is(Stderr) {
+                Red.paint("Error").to_string()
+            } else {
+                "Error".to_string()
+            };
+
+            eprintln!("{}: {}", prefix, message);
+            1
         }
     }
 }
@@ -176,7 +159,14 @@ fn multiline_to_html_br(value: &str) -> Result<String, Box<dyn Error>> {
     Ok(collated)
 }
 
-fn list_everything() -> Result<(), Box<dyn Error>> {
+fn list_everything(format: Format) -> Result<(), Box<dyn Error>> {
+    match format {
+        Format::Text => list_everything_text(),
+        Format::Markdown => list_everything_markdown(),
+    }
+}
+
+fn list_everything_text() -> Result<(), Box<dyn Error>> {
     process_everything(&|term| {
         dump_key_to_stdout(term)?;
         // TODO: At this point I need to refactor things so that I can lookup arbitrary keys! Currently
@@ -451,7 +441,7 @@ fn display_from_appropriate_path(
     // Is there a smart way to colour the whole string but still allow pattern
     // substitution? Also is there a better way to turn it off if we're not
     // talking to a tty?
-    eprintln!(
+    let message = format!(
         "No definition found for '{}'",
         if atty::is(Stderr) {
             Red.paint(key).to_string()
@@ -459,7 +449,7 @@ fn display_from_appropriate_path(
             key.to_string()
         }
     );
-    Err(std::io::Error::from(ErrorKind::NotFound).into())
+    Err(message.into())
 }
 
 fn dump_file_to_output(file: File, output: &mut dyn Write) -> Result<(), Box<dyn Error>> {

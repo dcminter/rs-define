@@ -83,7 +83,6 @@ This is not an exhaustive list
   * ~~Drive logging from clap parameter instead of `DEFINE_LOG`(changed default from `RUST_LOG`) (and default to completely off!)~~
   * ~~Complete the basic write behaviour~~
   * ~~Handle the directory not existing during when storing a value (attempt to create)~~
-  * ~~Proper error handling (write path) including error levels~~
   * ~~Colour (ANSI) output~~
   * ~~Add an [asciinema](https://asciinema.org/) demo to the README!~~
   * [Normalisation](#Normalisation)
@@ -91,11 +90,13 @@ This is not an exhaustive list
   * Tidy up any TODO issues
   * ~~Match read-paths ignoring case (i.e. currently "LOTR" != "LotR")~~ (achieved by squashing to lower-case by default, added flag to optionally disable)
   * ~~Basic deletion capability~~
+  * Update the asciinema demo to include the delete capability
 
 ## Future features
 
   * Namespacing
-    * My thinking here is that one might wish to distinguish between definitions in various context, so that for example `define bff --context social-media` might output 'Best Friends Forever' but `define bff --context development` might output 'Backend For Frontend' ... but that's very clunky and does it add enough value to be worth bothering? Something to ponder. 
+    * My thinking here is that one might wish to distinguish between definitions in various context, so that for example `define bff --context social-media` might output 'Best Friends Forever' but `define bff --context development` might output 'Backend For Frontend' ... but that's very clunky and does it add enough value to be worth bothering? Something to ponder.
+    * Another thought is that if the invoked binary's renamed (or symlinked) to something other than "define" I could use that as the context name, then I could just do `social-media bff` instead of needing to add that argument
   * Allow for hosting of definitions on a remote server instead of, or as well as, in the local filesystem.
     * I'm torn between a custom protocol (which is more fun) and just using Redis or something similar that already exists.
   * Maybe fix up for Windows as well as Linux?
