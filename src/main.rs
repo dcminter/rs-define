@@ -7,8 +7,8 @@ use regex::Regex;
 use std::collections::HashSet;
 use std::error::Error;
 use std::ffi::OsString;
+use std::fs::File;
 use std::fs::OpenOptions;
-use std::fs::{File, ReadDir};
 use std::io::{BufRead, BufReader, BufWriter, ErrorKind, Seek, SeekFrom, Write};
 use std::iter::FromIterator;
 use std::path::PathBuf;
@@ -123,8 +123,6 @@ fn error_paint(text: &str) -> String {
 }
 
 fn list_everything_markdown() -> Result<(), Box<dyn Error>> {
-    // TODO: Make header texts configurable?
-    // TODO: Pad things to be visually nice and neat?
     println!("| Term | Definition |");
     println!("| ---- | ---------- |");
     process_everything(&|term| {
@@ -176,7 +174,6 @@ fn list_everything_text() -> Result<(), Box<dyn Error>> {
     })
 }
 
-// TODO: Extract a more general method that can accept alternative output formatting
 fn process_everything(
     handle_term: &dyn Fn(&String) -> Result<(), Box<dyn Error>>,
 ) -> Result<(), Box<dyn Error>> {
@@ -186,14 +183,14 @@ fn process_everything(
         .collect();
     log::debug!("Content paths (existing): {:?}", possible_content_paths);
 
-    // TODO: Error handling here is a bit sketchy
+    // List all the terms from the content paths...
     let terms: HashSet<String> = possible_content_paths
-        .into_iter()
-        .map(|path: PathBuf| path.read_dir().unwrap())
-        .map(|directory: ReadDir| directory.map(|entry| entry.unwrap()))
+        .iter()
+        .flat_map(|path| path.read_dir())
         .flatten()
-        .filter(|entry| entry.file_type().unwrap().is_file())
-        .map(|entry| entry.file_name())
+        .flatten()
+        .filter(|entry| entry.file_type().map_or(false, |e| e.is_file()))
+        .map(|file_entry| file_entry.file_name())
         .map(|name| name.to_string_lossy().to_string())
         .collect();
     log::debug!("Refined down to unique term keys: {:?}", terms);
@@ -262,7 +259,7 @@ fn store_on_appropriate_path(
             }
             Ok(mut file) => {
                 log::debug!("Opened file for appending on path {:?}", &candidate_path);
-                if file.contains_text(&file, &value) {
+                if file.contains_text(&file, &value)? {
                     log::debug!("File already contains the value, dumping to console");
                     file.seek(SeekFrom::Start(0))?;
                     dump_file_to_output(file, &mut io::stdout())?;
@@ -319,22 +316,22 @@ fn materialize_path(path: &PathBuf) -> Result<(), Box<dyn Error>> {
 
 // This is probably overkill, I just wanted to try it :)
 trait ContainsText {
-    fn contains_text(&self, file: &File, text: &str) -> bool;
+    fn contains_text(&self, file: &File, text: &str) -> Result<bool, Box<dyn Error>>;
 }
 
 impl ContainsText for File {
-    fn contains_text(&self, file: &File, text: &str) -> bool {
+    fn contains_text(&self, file: &File, text: &str) -> Result<bool, Box<dyn Error>> {
         let reader = BufReader::new(file);
 
         // TODO: Ignore case
         let pattern: &str = &["^", &regex::escape(text), "$"].concat();
 
-        // Are the following unwraps cool or should I be handling this more explicitly?
-        let re = Regex::new(&pattern).unwrap();
-        reader
+        let re = Regex::new(&pattern)?;
+        Ok(reader
             .lines()
             .into_iter()
-            .any(|line| re.is_match(&line.unwrap()))
+            .flatten()
+            .any(|line| re.is_match(&line)))
     }
 }
 
